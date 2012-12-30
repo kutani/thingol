@@ -22,70 +22,41 @@ SOFTWARE.
 
 package main
 
-type User struct {
-	id        int
-	name      string
-	desc      string
-	inventory []Thing
-	parent    Container
+import (
+	"database/sql"
+	"fmt"
+	_ "github.com/ziutek/mymysql/godrv"
+)
+
+type dbHandler struct {
+	con    *sql.DB
+	dbsend chan string
+	dbrecv chan *sql.Rows
 }
 
-func (self *User) setId(i int) {
-	self.id = i
+func (db *dbHandler) Connect() error {
+	con, err := sql.Open("mymysql", "unix:/var/run/mysql/mysql.sock*thingol/thingoltest/")
+
+	db.con = con
+
+	return err
 }
 
-func (self *User) getId() int {
-	return self.id
+func (db *dbHandler) Close() {
+	db.con.Close()
 }
 
-func (self *User) SetName(n string) {
-	self.name = n
-}
+func (db *dbHandler) handleDB() {
+	for {
+		a := <-db.dbsend
 
-func (self *User) SetDesc(n string) {
-	self.desc = n
-}
+		rows, err := db.con.Query(a)
 
-func (self *User) GetName() string {
-	return self.name
-}
-
-func (self *User) GetDesc() string {
-	return self.desc
-}
-
-func (self *User) SetParent(c Container) {
-	self.parent = c
-}
-
-func (self *User) GetContents() []Thing {
-	return self.inventory
-}
-
-func (self *User) AddThing(t Thing) {
-	l := 0
-	if self.inventory != nil {
-		l = len(self.inventory)
-	}
-	n_iarry := make([]Thing, l+1)
-	copy(n_iarry, self.inventory)
-
-	self.inventory = n_iarry
-	self.inventory[l] = t
-	t.SetParent(self)
-}
-
-func (self *User) GetThingByName(n string) Thing {
-	l := 0
-	if self.inventory != nil {
-		l = len(self.inventory)
-	}
-
-	for i := 0; i < l; i++ {
-		if self.inventory[i].GetName() == n {
-			return self.inventory[i]
+		if err != nil {
+			fmt.Println(err)
+			db.dbrecv <- nil
 		}
-	}
 
-	return nil
+		db.dbrecv <- rows
+	}
 }

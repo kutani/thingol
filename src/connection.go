@@ -23,82 +23,68 @@ SOFTWARE.
 package main
 
 import (
-	"database/sql"
+	"bufio"
 	"fmt"
 	"net"
 )
 
-type Thing interface {
-	setId(i int)
-	getId() int
-	SetName(n string)
-	SetDesc(n string)
-	GetName() string
-	GetDesc() string
-	SetParent(c Container)
+type UserConnection struct {
+	C      net.Conn
+	recbuf *bufio.Reader
+	senbuf *bufio.Writer
 }
 
-type Container interface {
-	GetContents() []Thing
-	AddThing(t Thing)
-	GetThingByName(n string) Thing
-}
+func (self *UserConnection) handleConnection() {
+	defer self.C.Close()
 
-type Command interface {
-	Help() string
-	LongHelp() string
-	Do()
-}
+	self.recbuf = bufio.NewReader(self.C)
+	self.senbuf = bufio.NewWriter(self.C)
 
-// The top-level room of the world heirarchy
-var rootRoom *Room = new(Room)
+	var input chan string = make(chan string)
+	var output chan string = make(chan string)
 
-// The Admin
-var rootUser *User = new(User)
-
-func main() {
-
-	/* Do our init stuff here; connecting to DB, etc */
-
-	db := new(dbHandler)
-	dberr := db.Connect()
-
-	if dberr != nil {
-		fmt.Println(dberr)
-		return
-	}
-
-	var dbsend chan string = make(chan string)
-	var dbrecv chan *sql.Rows = make(chan *sql.Rows)
-
-	db.dbsend = dbsend
-	db.dbrecv = dbrecv
-
-	go db.handleDB()
-
-	defer db.Close()
-
-	/* Init done, now start listening for connections */
-
-	ln, err := net.Listen("tcp", ":8067")
-	if err != nil {
-		fmt.Println("Failed listening: ", err)
-		return
-	}
+	go self.Recieve(input)
+	go self.Send(output)
 
 	for {
-		conn, err := ln.Accept()
+		m := <-input
+		go self.handleCommand(m, output)
+	}
+
+	return
+}
+
+func (self *UserConnection) handleCommand(m string, out chan<- string) {
+	fmt.Println(m)
+	return
+}
+
+func (self *UserConnection) Send(in <-chan string) {
+	for {
+		m := <-in
+
+		ret, err := self.senbuf.WriteString(m)
+		err = self.senbuf.WriteByte('\n')
+		self.senbuf.Flush()
+
+		if ret != len(m) && err != nil {
+			// TODO Handle the error
+			continue
+		}
+	}
+}
+
+func (self *UserConnection) Recieve(out chan<- string) {
+	for {
+		ret, err := self.recbuf.ReadString('\n')
 
 		if err != nil {
-			fmt.Println("Failed accepting: ", err)
+			// TODO Handle the error
 			continue
 		}
 
-		/* We've got a new connection; send it off to have fun */
+		ret = ret[:len(ret)-1]
 
-		c := new(UserConnection)
-		c.C = conn
-
-		go c.handleConnection()
+		out <- ret
 	}
 }

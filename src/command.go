@@ -22,10 +22,9 @@ SOFTWARE.
 
 package main
 
-
 type GoCmd struct {
-	cmd string
-	help string
+	cmd      string
+	help     string
 	longhelp string
 	function func()
 }

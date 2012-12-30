@@ -23,12 +23,12 @@ SOFTWARE.
 package main
 
 type Room struct {
-	id int
-	name string
-	desc string
-	owner User
+	id       int
+	name     string
+	desc     string
+	owner    User
 	contents []Thing
-	parent Container
+	parent   Container
 }
 
 func (self *Room) setId(i int) {
