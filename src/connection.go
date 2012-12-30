@@ -26,16 +26,83 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"time"
 )
 
+// Minimum size of the connection stack
+const MINSTACKSIZE int = 64
+
+// The user connection stack
+var cStack = make([]*UserConnection, 0, MINSTACKSIZE)
+
+func append_to_cStack(c *UserConnection) {
+	l := len(cStack)
+
+	if l+1 > cap(cStack) {
+		n_csarry := make([]*UserConnection, l*2)
+		copy(n_csarry, cStack)
+		cStack = n_csarry
+	}
+
+	cStack = cStack[0 : l+1]
+	cStack[l] = c
+}
+
+func ConnectionStackManager() {
+	for {
+		expireConnections()
+
+		// Trip the stack
+		if len(cStack) < cap(cStack)/2 && cap(cStack) > MINSTACKSIZE {
+			n_csarry := make([]*UserConnection, len(cStack), cap(cStack)/2)
+			copy(n_csarry, cStack)
+			cStack = n_csarry
+		}
+
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func connectionExists(s string) bool {
+	for i := 0; i < len(cStack); i++ {
+		if s == cStack[i].user {
+			return true
+		}
+	}
+	return false
+}
+
+func expireConnections() {
+	l := len(cStack)
+
+	n_csarry := make([]*UserConnection, 0, cap(cStack))
+
+	for i := 0; i < l; i++ {
+		if !cStack[i].awake {
+			fmt.Println("Expiring connection")
+			continue
+		}
+		n_csarry = append(n_csarry, cStack[i])
+	}
+
+	cStack = n_csarry
+}
+
 type UserConnection struct {
-	C      net.Conn
-	recbuf *bufio.Reader
-	senbuf *bufio.Writer
+	C        net.Conn
+	recbuf   *bufio.Reader
+	senbuf   *bufio.Writer
+	user     string
+	conntime int
+	idletime int
+	awake    bool
 }
 
 func (self *UserConnection) handleConnection() {
 	defer self.C.Close()
+	defer self.Expire()
+
+	fmt.Println("Handling new connection")
 
 	self.recbuf = bufio.NewReader(self.C)
 	self.senbuf = bufio.NewWriter(self.C)
@@ -51,12 +118,20 @@ func (self *UserConnection) handleConnection() {
 		go self.handleCommand(m, output)
 	}
 
+	self.awake = false
+
 	return
 }
 
 func (self *UserConnection) handleCommand(m string, out chan<- string) {
-	fmt.Println(m)
+
+	/* Do something with the command we've recieved */
+
 	return
+}
+
+func (self *UserConnection) Expire() {
+	self.awake = false
 }
 
 func (self *UserConnection) Send(in <-chan string) {

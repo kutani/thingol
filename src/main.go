@@ -58,8 +58,14 @@ var rootUser *User = new(User)
 
 func main() {
 
-	/* Do our init stuff here; connecting to DB, etc */
+	/* 
+	 * Do our init stuff here; connecting to DB, etc
+	 */
 
+	// Start the connection stack manager
+	go ConnectionStackManager()
+
+	// Start the DB handler
 	db := new(dbHandler)
 	dberr := db.Connect()
 
@@ -78,7 +84,9 @@ func main() {
 
 	defer db.Close()
 
-	/* Init done, now start listening for connections */
+	/*
+	 * Init done, now start listening for connections
+	 */
 
 	ln, err := net.Listen("tcp", ":8067")
 	if err != nil {
@@ -94,10 +102,13 @@ func main() {
 			continue
 		}
 
-		/* We've got a new connection; send it off to have fun */
+		// We've got a new connection; send it off to have fun
 
 		c := new(UserConnection)
 		c.C = conn
+
+		c.awake = true
+		append_to_cStack(c)
 
 		go c.handleConnection()
 	}

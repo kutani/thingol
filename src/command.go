@@ -29,6 +29,8 @@ type GoCmd struct {
 	function func()
 }
 
+var FuncMap map[string]Command = make(map[string]Command)
+
 func (self *GoCmd) Help() string {
 	return self.help
 }
