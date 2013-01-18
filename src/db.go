@@ -35,7 +35,7 @@ type dbHandler struct {
 }
 
 func (db *dbHandler) Connect() error {
-	con, err := sql.Open("mymysql", "unix:/var/run/mysql/mysql.sock*thingol/thingoltest/")
+	con, err := sql.Open("mymysql", "unix:/var/run/mysql/mysql.sock*thingol/thingol/thingoltest")
 
 	db.con = con
 

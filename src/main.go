@@ -82,6 +82,8 @@ func main() {
 
 	go db.handleDB()
 
+	theMuck.db = db
+
 	defer db.Close()
 
 	/*

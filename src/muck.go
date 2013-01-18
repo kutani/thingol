@@ -23,43 +23,75 @@ SOFTWARE.
 package main
 
 import (
-	"strconv"
+	"fmt"
+	"io"
+	"crypto/sha256"
 )
 
-type GoCmd struct {
-	cmd      string
-	help     string
-	longhelp string
-	function func()
+type Muck struct {
+	db *dbHandler
 }
 
-var FuncMap map[string]Command = make(map[string]Command)
-
-func (self *GoCmd) Help() string {
-	return self.help
-}
-
-func (self *GoCmd) LongHelp() string {
-	return self.longhelp
-}
-
-func (self *GoCmd) Do() {
-	self.function()
-}
-
-func (self *GoCmd) SetFunc(f func()) {
-	self.function = f
-}
+var theMuck Muck
 
 
-func WHO(out chan<- string) {
-	l := len(cStack)
+func (self *Muck) auth(u string, p string) bool {
+	passhash := shapass(p)
 
-	out <- "There are "+strconv.Itoa(l)+" users connected:"
-	for i := 0; i < l; i++ {
-		if cStack[i].user == "" {
-			continue
-		}
-		out <- cStack[i].user+"\tConnTime: "+strconv.Itoa(cStack[i].conntime)
+	// TODO Sanitize string u for sql safety
+
+	q := "select passhash from users where name = '"+u+"';\n"
+
+	self.db.dbsend <- q
+
+	r := <-self.db.dbrecv
+
+	var ret string
+
+	if ! r.Next() {
+		return false
 	}
+
+	err := r.Scan(&ret)
+
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+
+
+	fmt.Printf("Comparing %s vs %s\n",passhash,ret)
+	if passhash == ret {
+		return true
+	}
+
+	return false
+}
+
+func (self *Muck) newacct(u string, p string) bool {
+	passhash := shapass(p)
+
+	q := "select name from users where name = '"+u+"';\n"
+	self.db.dbsend <- q
+	r := <-self.db.dbrecv
+
+	if r.Next() {
+		return false
+	}
+
+	q = "insert into users (name,passhash) values ('"+u+"','"+passhash+"');\n"
+	self.db.dbsend <- q
+	r = <-self.db.dbrecv
+
+	if ! r.Next() {
+		return false
+	}
+
+	return true;
+}
+
+func shapass(p string) string {
+	h := sha256.New()
+	io.WriteString(h, p)
+	return fmt.Sprintf("%x", h.Sum(nil))
 }

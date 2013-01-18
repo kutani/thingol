@@ -23,6 +23,7 @@ SOFTWARE.
 package main
 
 import (
+	"strings"
 	"bufio"
 	"fmt"
 	"net"
@@ -126,9 +127,34 @@ func (self *UserConnection) handleConnection() {
 func (self *UserConnection) handleCommand(m string, out chan<- string) {
 
 	/* Do something with the command we've recieved */
+	if m == "WHO" {
+		WHO(out)
+		return
+	}
+
+	var prs []string = strings.Split(m," ")
+
+	if( prs[0] == "LOGIN" ) {
+		if ! theMuck.auth(prs[1],prs[2]) {
+			out <- "Login failed."
+		} else {
+			out <- "OK"
+		}
+		return
+	}
+
+	if( prs[0] == "NEWUSER" ) {
+		if ! theMuck.newacct(prs[1],prs[2]) {
+			out <- "New User create failed."
+		} else {
+			out <- "OK"
+		}
+		return
+	}
 
 	return
 }
+
 
 func (self *UserConnection) Expire() {
 	self.awake = false
@@ -158,7 +184,7 @@ func (self *UserConnection) Recieve(out chan<- string) {
 			continue
 		}
 
-		ret = ret[:len(ret)-1]
+		ret = ret[:len(ret)-2]
 
 		out <- ret
 	}
